@@ -1,0 +1,19 @@
+package local.dev;
+import java.util.Map;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@SpringBootApplication
+@RestController
+public class DemoApplication {
+    private final JdbcTemplate jdbc;
+    public DemoApplication(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public static void main(String[] args) { SpringApplication.run(DemoApplication.class, args); }
+    @GetMapping("/api/hello")
+    public Map<String, Object> hello() {
+        return Map.of("service", "Spring Boot", "java", System.getProperty("java.version"), "database", jdbc.queryForObject("SELECT 1", Integer.class));
+    }
+}

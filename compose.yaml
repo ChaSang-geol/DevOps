@@ -1,0 +1,78 @@
+services:
+  nginx:
+    image: nginx:stable-alpine
+    ports: ["127.0.0.1:8080:80"]
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./apps/php:/var/www/html:ro
+    depends_on: [php]
+    restart: unless-stopped
+  php:
+    build: ./docker/php
+    environment:
+      DB_HOST: mariadb
+      DB_DATABASE: ${MARIADB_DATABASE:-app}
+      DB_USERNAME: ${MARIADB_USER:-app}
+      DB_PASSWORD: ${MARIADB_PASSWORD:?Copy .env.example to .env}
+    volumes:
+      - ./apps/php:/var/www/html
+      - ${DATA_ROOT:-C:/Projects/DATA/devops}/php:/data
+    depends_on:
+      mariadb: {condition: service_healthy}
+    restart: unless-stopped
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      TZ: Asia/Seoul
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-app}
+      MARIADB_USER: ${MARIADB_USER:-app}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:?Copy .env.example to .env}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Set root password in .env}
+    ports: ["127.0.0.1:${DB_PORT:-3306}:3306"]
+    volumes:
+      - ${DATA_ROOT:-C:/Projects/DATA/devops}/mariadb:/var/lib/mysql
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+  spring:
+    image: maven:3.9-eclipse-temurin-17
+    working_dir: /workspace
+    command: mvn spring-boot:run
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://mariadb:3306/${MARIADB_DATABASE:-app}
+      SPRING_DATASOURCE_USERNAME: ${MARIADB_USER:-app}
+      SPRING_DATASOURCE_PASSWORD: ${MARIADB_PASSWORD:?Copy .env.example to .env}
+    ports: ["127.0.0.1:8081:8080"]
+    volumes:
+      - ./apps/spring:/workspace
+      - ${DATA_ROOT:-C:/Projects/DATA/devops}/maven:/root/.m2
+      - ${DATA_ROOT:-C:/Projects/DATA/devops}/spring:/data
+    depends_on:
+      mariadb: {condition: service_healthy}
+    restart: unless-stopped
+  react:
+    image: node:22-bookworm-slim
+    working_dir: /workspace
+    command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
+    ports: ["127.0.0.1:5173:5173"]
+    volumes:
+      - ./apps/react:/workspace
+      - ${DATA_ROOT:-C:/Projects/DATA/devops}/react/node_modules:/workspace/node_modules
+      - ${DATA_ROOT:-C:/Projects/DATA/devops}/npm:/root/.npm
+    restart: unless-stopped
+  python:
+    build: ./apps/python
+    working_dir: /workspace
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+    ports: ["127.0.0.1:8000:8000"]
+    volumes:
+      - ./apps/python:/workspace
+      - ${DATA_ROOT:-C:/Projects/DATA/devops}/python:/data
+    restart: unless-stopped

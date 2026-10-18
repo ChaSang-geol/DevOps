@@ -1,4 +1,11 @@
 # Build and Release Folders
+.env
+node_modules/
+target/
+dist/
+__pycache__/
+.venv/
+*.pyc
 bin-debug/
 bin-release/
 [Oo]bj/
